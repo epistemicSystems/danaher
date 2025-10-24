@@ -3,6 +3,12 @@
 
 (def default-roi {:x 0.25 :y 0.25 :w 0.5 :h 0.5})
 
+(def min-alpha 1.0)
+(def max-alpha 40.0)
+(def min-band-low 0.05)
+(def max-band-high 3.0)
+(def min-band-gap 0.05)
+
 (defonce app-state
   (r/atom {:alpha 20.0
            :band {:low 0.1 :high 0.7}
@@ -22,10 +28,22 @@
                       :last-update-origin :auto}}))
 
 (defn update-alpha! [v]
-  (swap! app-state assoc :alpha v))
+  (swap! app-state assoc :alpha (-> v (max min-alpha) (min max-alpha))))
 
 (defn update-band! [{:keys [low high]}]
-  (swap! app-state assoc :band {:low low :high high}))
+  (swap! app-state
+         (fn [state]
+           (let [band (:band state)
+                 current-low (:low band)
+                 current-high (:high band)
+                 low (-> (or low current-low)
+                         (max min-band-low)
+                         (min (- max-band-high min-band-gap)))
+                 high (-> (or high current-high)
+                          (max (+ low min-band-gap))
+                          (min max-band-high))
+                 low (min low (- high min-band-gap))]
+             (assoc state :band {:low low :high high})))))
 
 (defn toggle-explain! []
   (swap! app-state update :explain? not))

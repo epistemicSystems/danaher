@@ -184,6 +184,20 @@
                               (.toFixed (* 100 (:y roi)) 0) "% · w"
                               (.toFixed (* 100 (:w roi)) 0) "% · h"
                               (.toFixed (* 100 (:h roi)) 0) "%")))
+    :ui/alpha-adjusted (let [{:keys [alpha previous]} payload]
+                         (when (number? alpha)
+                           (str "α " (.toFixed alpha 2)
+                                (when (number? previous)
+                                  (str " (was " (.toFixed previous 2) ")")))))
+    :ui/band-adjusted (let [{:keys [band previous]} payload
+                            {:keys [low high]} band
+                            prev-low (:low previous)
+                            prev-high (:high previous)]
+                        (when (and band (number? low) (number? high))
+                          (str (.toFixed low 2) "–" (.toFixed high 2) " Hz"
+                               (when (and (number? prev-low) (number? prev-high))
+                                 (str " (was " (.toFixed prev-low 2)
+                                      "–" (.toFixed prev-high 2) " Hz)")))))
     :ui/timeline-scrubbed (let [{:keys [cursor-index sample]} payload
                                  {:keys [amplitude breath-rate]} sample
                                  bpm (when (and breath-rate (pos? breath-rate))

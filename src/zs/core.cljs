@@ -158,6 +158,8 @@
 (def video-watch-key ::video-render)
 (def roi-event-watch-key ::roi-events)
 (def timeline-event-watch-key ::timeline-events)
+(def alpha-event-watch-key ::alpha-events)
+(def band-event-watch-key ::band-events)
 
 (defn- record-session-start! [session-state]
   (when-let [session-id (:session/id session-state)]
@@ -222,6 +224,34 @@
                                                      :session/id (:session/id new)
                                                      :payload {:roi (:roi new)}})]
                    (state/select-event! (:event/id recorded))))))
+  (remove-watch state/app-state alpha-event-watch-key)
+  (add-watch state/app-state alpha-event-watch-key
+             (fn [_ _ old new]
+               (let [old-alpha (:alpha old)
+                     new-alpha (:alpha new)
+                     session-id (:session/id new)]
+                 (when (and session-id
+                            (number? new-alpha)
+                            (not= old-alpha new-alpha))
+                   (when-let [recorded (store/record! {:event/type :ui/alpha-adjusted
+                                                       :session/id session-id
+                                                       :payload {:alpha new-alpha
+                                                                 :previous old-alpha}})]
+                     (state/select-event! (:event/id recorded)))))))
+  (remove-watch state/app-state band-event-watch-key)
+  (add-watch state/app-state band-event-watch-key
+             (fn [_ _ old new]
+               (let [old-band (:band old)
+                     new-band (:band new)
+                     session-id (:session/id new)]
+                 (when (and session-id
+                            (map? new-band)
+                            (not= old-band new-band))
+                   (when-let [recorded (store/record! {:event/type :ui/band-adjusted
+                                                       :session/id session-id
+                                                       :payload {:band new-band
+                                                                 :previous old-band}})]
+                     (state/select-event! (:event/id recorded)))))))
   (remove-watch state/app-state timeline-event-watch-key)
   (add-watch state/app-state timeline-event-watch-key
              (fn [_ _ old new]
@@ -284,7 +314,9 @@
   (reset! video-el* nil)
   (remove-watch state/app-state video-watch-key)
   (remove-watch state/app-state roi-event-watch-key)
-  (remove-watch state/app-state timeline-event-watch-key))
+  (remove-watch state/app-state timeline-event-watch-key)
+  (remove-watch state/app-state alpha-event-watch-key)
+  (remove-watch state/app-state band-event-watch-key))
 
 (defn init []
   (start))

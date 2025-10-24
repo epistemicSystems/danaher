@@ -158,6 +158,43 @@
 (def video-watch-key ::video-render)
 (def roi-event-watch-key ::roi-events)
 (def timeline-event-watch-key ::timeline-events)
+(def alpha-event-watch-key ::alpha-events)
+(def band-event-watch-key ::band-events)
+
+(defn- record-session-start! [session-state]
+  (when-let [session-id (:session/id session-state)]
+    (store/record! {:event/type :session/start
+                    :session/id session-id
+                    :payload {:alpha (:alpha session-state)
+                              :band (:band session-state)
+                              :roi (:roi session-state)}})))
+
+(defn- record-session-stop! [session-state]
+  (when-let [session-id (:session/id session-state)]
+    (store/record! {:event/type :session/stop
+                    :session/id session-id
+                    :payload {:breath-rate (:breath-rate session-state)
+                              :samples (count (:history session-state))}})))
+
+(defn restart-session! []
+  (let [previous @state/app-state
+        stop-event (record-session-stop! previous)
+        preserved-roi (:roi previous)
+        preserved-status (:status previous)
+        session-state (state/begin-session! {:roi preserved-roi
+                                             :status (or preserved-status :running)})
+        start-event (record-session-start! session-state)]
+    (when (= preserved-status :running)
+      (state/set-status! :running))
+    (when stop-event
+      (state/select-event! (:event/id stop-event)))
+    (when start-event
+      (state/select-event! (:event/id start-event)))))
+
+(defn clear-events! []
+  (store/clear!)
+  (state/clear-selection!)
+  (state/reset-clipboard-status!))
 
 (defn- video-ref [el]
   (reset! video-el* el))
@@ -170,7 +207,8 @@
 
 (defn mount-surfaces []
   (when-let [container (.getElementById js/document "app")]
-    (rdom/render [ui/controls] container))
+    (rdom/render [ui/controls {:on-new-session restart-session!
+                               :on-clear-events clear-events!}] container))
   (when-let [video-container (.getElementById js/document "video-panel")]
     (rdom/render (render-video-panel @state/app-state) video-container))
   (remove-watch state/app-state video-watch-key)
@@ -186,6 +224,34 @@
                                                      :session/id (:session/id new)
                                                      :payload {:roi (:roi new)}})]
                    (state/select-event! (:event/id recorded))))))
+  (remove-watch state/app-state alpha-event-watch-key)
+  (add-watch state/app-state alpha-event-watch-key
+             (fn [_ _ old new]
+               (let [old-alpha (:alpha old)
+                     new-alpha (:alpha new)
+                     session-id (:session/id new)]
+                 (when (and session-id
+                            (number? new-alpha)
+                            (not= old-alpha new-alpha))
+                   (when-let [recorded (store/record! {:event/type :ui/alpha-adjusted
+                                                       :session/id session-id
+                                                       :payload {:alpha new-alpha
+                                                                 :previous old-alpha}})]
+                     (state/select-event! (:event/id recorded)))))))
+  (remove-watch state/app-state band-event-watch-key)
+  (add-watch state/app-state band-event-watch-key
+             (fn [_ _ old new]
+               (let [old-band (:band old)
+                     new-band (:band new)
+                     session-id (:session/id new)]
+                 (when (and session-id
+                            (map? new-band)
+                            (not= old-band new-band))
+                   (when-let [recorded (store/record! {:event/type :ui/band-adjusted
+                                                       :session/id session-id
+                                                       :payload {:band new-band
+                                                                 :previous old-band}})]
+                     (state/select-event! (:event/id recorded)))))))
   (remove-watch state/app-state timeline-event-watch-key)
   (add-watch state/app-state timeline-event-watch-key
              (fn [_ _ old new]
@@ -233,11 +299,7 @@
 (defn start []
   (store/load!)
   (let [session-state (state/begin-session!)]
-    (when-let [recorded (store/record! {:event/type :session/start
-                                        :session/id (:session/id session-state)
-                                        :payload {:alpha (:alpha session-state)
-                                                  :band (:band session-state)
-                                                  :roi (:roi session-state)}})]
+    (when-let [recorded (record-session-start! session-state)]
       (state/select-event! (:event/id recorded))))
   (mount-surfaces)
   (boot!))
@@ -246,16 +308,15 @@
   (when-let [f @cleanup*]
     (f)
     (reset! cleanup* nil))
-  (when-let [session-id (:session/id @state/app-state)]
-    (when-let [recorded (store/record! {:event/type :session/stop
-                                        :session/id session-id
-                                        :payload {:breath-rate (:breath-rate @state/app-state)
-                                                  :samples (count (:history @state/app-state))}})]
+  (when (:session/id @state/app-state)
+    (when-let [recorded (record-session-stop! @state/app-state)]
       (state/select-event! (:event/id recorded))))
   (reset! video-el* nil)
   (remove-watch state/app-state video-watch-key)
   (remove-watch state/app-state roi-event-watch-key)
-  (remove-watch state/app-state timeline-event-watch-key))
+  (remove-watch state/app-state timeline-event-watch-key)
+  (remove-watch state/app-state alpha-event-watch-key)
+  (remove-watch state/app-state band-event-watch-key))
 
 (defn init []
   (start))

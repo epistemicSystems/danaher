@@ -184,6 +184,20 @@
                               (.toFixed (* 100 (:y roi)) 0) "% · w"
                               (.toFixed (* 100 (:w roi)) 0) "% · h"
                               (.toFixed (* 100 (:h roi)) 0) "%")))
+    :ui/alpha-adjusted (let [{:keys [alpha previous]} payload]
+                         (when (number? alpha)
+                           (str "α " (.toFixed alpha 2)
+                                (when (number? previous)
+                                  (str " (was " (.toFixed previous 2) ")")))))
+    :ui/band-adjusted (let [{:keys [band previous]} payload
+                            {:keys [low high]} band
+                            prev-low (:low previous)
+                            prev-high (:high previous)]
+                        (when (and band (number? low) (number? high))
+                          (str (.toFixed low 2) "–" (.toFixed high 2) " Hz"
+                               (when (and (number? prev-low) (number? prev-high))
+                                 (str " (was " (.toFixed prev-low 2)
+                                      "–" (.toFixed prev-high 2) " Hz)")))))
     :ui/timeline-scrubbed (let [{:keys [cursor-index sample]} payload
                                  {:keys [amplitude breath-rate]} sample
                                  bpm (when (and breath-rate (pos? breath-rate))
@@ -301,14 +315,20 @@
        [:p {:class "event-inspector-empty"}
         "Events will appear here once the session begins streaming."])]))
 
-(defn controls []
-  (let [{:keys [alpha band breath-rate explain? status history roi timeline] :as current} @state/app-state
+(defn controls [{:keys [on-new-session on-clear-events]}]
+  (let [on-new-session (or on-new-session (fn [] nil))
+        on-clear-events (or on-clear-events (fn [] nil))
+        {:keys [alpha band breath-rate explain? status history roi timeline] :as current} @state/app-state
         bpm (* breath-rate 60)
         session-id (:session/id current)
         inspector (:inspector current)
         events (->> (store/recent-events 6) reverse)
         selected-event-id (get inspector :selected-event-id)
-        clipboard (get inspector :clipboard)]
+        clipboard (get inspector :clipboard)
+        samples (count history)
+        session-label (when session-id
+                        (let [prefix (subs session-id 0 (min 8 (count session-id)))]
+                          (str "Session " prefix "…")))]
     [:div {:class "controls"}
      [:div
       [:h2 "Breath Signal"]
@@ -318,6 +338,15 @@
          :initializing "Initializing sensors"
          :error "WebGPU unavailable"
          "Idle")]]
+     [:div {:class "session-meta"}
+      [:span (or session-label "No session yet")]
+      [:span (str samples " samples")]]
+     [:div {:class "session-actions"}
+      [:button {:on-click #(on-new-session)} "Start new session"]
+      [:button {:class "secondary"
+                :on-click #(when (js/confirm "Clear all stored events? This cannot be undone.")
+                             (on-clear-events))}
+       "Clear stored events"]]
      [slider {:label "Gain α"
               :min 1 :max 40 :step 0.5
               :value alpha

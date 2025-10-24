@@ -83,6 +83,33 @@
         text-transform: uppercase;
         letter-spacing: 0.08em;
       }
+      .session-meta {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.5rem;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        opacity: 0.75;
+      }
+      .session-actions {
+        display: flex;
+        gap: 0.5rem;
+      }
+      .session-actions button {
+        flex: 1;
+        font-size: 0.85rem;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+      .session-actions button.secondary {
+        background: rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.85);
+      }
+      .session-actions button.secondary:hover {
+        background: rgba(255, 99, 132, 0.18);
+        color: rgba(255, 107, 129, 0.95);
+      }
       .timeline {
         border-top: 1px solid rgba(255, 255, 255, 0.08);
         padding-top: 0.75rem;

@@ -1,0 +1,9 @@
+{:deps true
+ :dev-http {8020 {:root "public"}}
+ :builds
+ {:app {:target :browser
+        :output-dir "public/js"
+        :asset-path "/js"
+        :modules {:main {:init-fn zs.core/init}}
+        :devtools {:before-load zs.core/stop
+                   :after-load zs.core/start}}}}

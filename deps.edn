@@ -1,0 +1,2 @@
+{:deps {reagent/reagent {:mvn/version "1.2.0"}
+        funcool/promesa {:mvn/version "11.0.678"}}}

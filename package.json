@@ -1,0 +1,16 @@
+{
+  "name": "zenith-strider",
+  "version": "0.1.0",
+  "description": "Markerless training assistant MVP",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev:shadow": "shadow-cljs watch app",
+    "dev:electron": "electron .",
+    "dev": "npm run dev:shadow",
+    "build": "shadow-cljs release app"
+  },
+  "devDependencies": {
+    "electron": "^28.3.1",
+    "shadow-cljs": "^2.26.2"
+  }
+}
